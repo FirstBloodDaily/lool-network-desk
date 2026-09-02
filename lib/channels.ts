@@ -14,6 +14,7 @@ export type Channel = {
   color: string;
   monthlyOpexUsd: number;
   opexPeople: { name: string; amount: number }[];
+  leagues: string[];
 };
 
 /** Hard allowlist — never query or display other YouTube channels. */
@@ -33,6 +34,7 @@ export const CHANNELS: Channel[] = [
       { name: "Joel", amount: 550 },
       { name: "Helen", amount: 250 },
     ],
+    leagues: ["First Stand", "LCK", "LEC", "LPL", "MSI", "Worlds"],
   },
   {
     id: "eventvods",
@@ -46,6 +48,7 @@ export const CHANNELS: Channel[] = [
     opexPeople: [
       { name: "Ricardo", amount: 500 },
     ],
+    leagues: ["First Stand", "LCK", "LEC", "LPL", "MSI", "Worlds"],
   },
   {
     id: "onivia",
@@ -62,6 +65,7 @@ export const CHANNELS: Channel[] = [
       { name: "Joel", amount: 0 },
       { name: "Helen", amount: 300 },
     ],
+    leagues: ["LCK", "LPL", "LEC", "LCS"],
   },
 ];
 

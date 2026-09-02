@@ -28,7 +28,7 @@ export function deskTodayStr(now = new Date()): string {
   return ymd(y, m, d);
 }
 
-function addDays(dateStr: string, days: number): string {
+export function addDays(dateStr: string, days: number): string {
   const [y, m, d] = dateStr.split("-").map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d + days));
   return ymd(dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate());

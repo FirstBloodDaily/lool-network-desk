@@ -18,6 +18,8 @@ export type ChannelBlock = {
   file?: string | null;
   uploadedAt?: string | null;
   fetchedAt?: string | null;
+  recentViews2d?: number | null;
+  recentViewsNote?: string | null;
 };
 
 export type RangeResolved = {

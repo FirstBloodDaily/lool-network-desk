@@ -1,6 +1,6 @@
 import { OPLOL_YOUTUBE_ID, CHANNELS } from "./channels";
 import { cacheDir, ensureDir } from "./data-dir";
-import { filterSeries } from "./range";
+import { addDays, deskTodayStr, filterSeries } from "./range";
 import type { ChannelBlock, DailyPoint, RangeResolved } from "./types";
 import fs from "node:fs";
 import path from "node:path";
@@ -145,6 +145,8 @@ async function queryReports(
   return { status: res.status, body };
 }
 
+const CACHE_MS = 5 * 60 * 1000;
+
 function cachePath(rng: RangeResolved): string {
   const name = `oplol_${rng.key}_${rng.start}_${rng.end}.json`.replace(/[^A-Za-z0-9._-]/g, "_");
   return path.join(cacheDir(), name);
@@ -163,6 +165,28 @@ function emptyOplol(note: string, error: string | null = null): ChannelBlock {
   };
 }
 
+function mergeDaySeries(full: DailyPoint[], viewsOnly: DailyPoint[]): DailyPoint[] {
+  const map = new Map<string, DailyPoint>();
+  for (const p of full) map.set(p.date, { ...p });
+  for (const p of viewsOnly) {
+    const cur = map.get(p.date);
+    if (!cur) {
+      map.set(p.date, { date: p.date, views: p.views, revenue: null, rpm: null });
+      continue;
+    }
+    if (p.views != null) cur.views = p.views;
+    cur.rpm = cur.revenue != null && cur.views ? (cur.revenue / cur.views) * 1000 : cur.rpm;
+  }
+  return [...map.values()].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function cacheAgeMs(block: ChannelBlock): number {
+  if (!block.fetchedAt) return Number.POSITIVE_INFINITY;
+  const t = Date.parse(block.fetchedAt);
+  if (!Number.isFinite(t)) return Number.POSITIVE_INFINITY;
+  return Date.now() - t;
+}
+
 export async function fetchOplolAnalytics(
   rng: RangeResolved,
   refresh = false,
@@ -174,7 +198,7 @@ export async function fetchOplolAnalytics(
   if (!refresh && fs.existsSync(file)) {
     try {
       const cached = JSON.parse(fs.readFileSync(file, "utf8")) as ChannelBlock;
-      if (cached.series?.length) {
+      if (cached.series?.length && cacheAgeMs(cached) < CACHE_MS) {
         return { ...cached, note: (cached.note || "YouTube Analytics") + " · cached" };
       }
     } catch {
@@ -185,41 +209,44 @@ export async function fetchOplolAnalytics(
   const tok = await refreshAccessToken();
   if ("error" in tok) return emptyOplol(tok.error, tok.error);
 
-  let { status, body } = await queryReports(tok.token, rng.start, rng.end, METRICS_FULL);
-  let revenueOk = true;
-  let note: string | null = "YouTube Analytics · OPLOLReplay";
+  const [fullRes, viewsRes] = await Promise.all([
+    queryReports(tok.token, rng.start, rng.end, METRICS_FULL),
+    queryReports(tok.token, rng.start, rng.end, METRICS_VIEWS),
+  ]);
 
-  if (status !== 200) {
-    const msg = googleErrorMessage(body);
-    const low = msg.toLowerCase();
-    const revenueForbidden =
-      status === 400 ||
-      status === 403 ||
-      low.includes("forbidden") ||
-      low.includes("estimatedrevenue") ||
-      low.includes("permission");
-    if (revenueForbidden || status !== 200) {
-      const second = await queryReports(tok.token, rng.start, rng.end, METRICS_VIEWS);
-      if (second.status === 200) {
-        body = second.body;
-        status = second.status;
-        revenueOk = false;
-        note =
-          "estimatedRevenue is not available on this Google login. Views only — revenue is not invented.";
-      } else {
-        return emptyOplol(
-          "Cannot read OPLOLReplay Analytics: " + msg,
-          msg,
-        );
-      }
-    }
+  let fullSeries: DailyPoint[] = [];
+  let viewsSeries: DailyPoint[] = [];
+  let note: string | null = "YouTube Analytics · OPLOLReplay · views queried separately from revenue so recent days are not dropped";
+  let revenueOk = false;
+
+  if (fullRes.status === 200) {
+    fullSeries = parseReport(fullRes.body as { columnHeaders?: { name?: string }[]; rows?: unknown[][] });
+    revenueOk = true;
+  }
+  if (viewsRes.status === 200) {
+    viewsSeries = parseReport(viewsRes.body as { columnHeaders?: { name?: string }[]; rows?: unknown[][] });
   }
 
-  let series = parseReport(body as { columnHeaders?: { name?: string }[]; rows?: unknown[][] });
+  if (!fullSeries.length && !viewsSeries.length) {
+    const msg = googleErrorMessage(fullRes.body) || googleErrorMessage(viewsRes.body);
+    return emptyOplol("Cannot read OPLOLReplay Analytics: " + msg, msg);
+  }
+
   if (!revenueOk) {
-    series = series.map((p) => ({ ...p, revenue: null, rpm: null }));
+    note = "estimatedRevenue is not available on this Google login. Views only — revenue is not invented.";
+    viewsSeries = viewsSeries.map((p) => ({ ...p, revenue: null, rpm: null }));
+    fullSeries = [];
   }
+
+  let series = mergeDaySeries(fullSeries, viewsSeries);
   series = filterSeries(series, rng.start, rng.end);
+
+  const today = deskTodayStr();
+  const from = addDays(today, -1);
+  const recentViews2d = series
+    .filter((p) => p.date >= from && p.date <= today && p.views != null)
+    .reduce((a, p) => a + (p.views || 0), 0);
+  const recentDays = series.filter((p) => p.date >= from && p.date <= today && p.views != null).map((p) => p.date);
 
   const rec: ChannelBlock = {
     channelId: "oplol",
@@ -230,6 +257,10 @@ export async function fetchOplolAnalytics(
     note: series.length ? note : "YouTube Analytics returned no rows for this range.",
     error: null,
     fetchedAt: new Date().toISOString(),
+    recentViews2d: recentDays.length ? recentViews2d : null,
+    recentViewsNote: recentDays.length
+      ? `Analytics views · ${recentDays.join(" + ")} (not Studio Realtime)`
+      : "No Analytics views for yesterday/today yet",
   };
   try {
     ensureDir(cacheDir());

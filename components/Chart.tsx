@@ -57,7 +57,7 @@ export default function Chart({
   }
 
   const H = tall ? 260 : 220;
-  const padL = 48, padR = 12, padT = 12, padB = 26;
+  const padL = 58, padR = 18, padT = 14, padB = 32;
   const innerW = Math.max(w - padL - padR, 40);
   const innerH = H - padT - padB;
   let min = Math.min(0, ...allVals);
@@ -94,7 +94,7 @@ export default function Chart({
 
   return (
     <div className={`chart ${tall ? "tall" : ""}`} ref={wrap}>
-      <svg viewBox={`0 0 ${w} ${H}`} preserveAspectRatio="none" onMouseMove={onMove} onMouseLeave={() => setTip(null)}>
+      <svg width={w} height={H} onMouseMove={onMove} onMouseLeave={() => setTip(null)}>
         {Array.from({ length: ticks + 1 }, (_, t) => {
           const v = min + ((max - min) * t) / ticks;
           return (
@@ -104,9 +104,10 @@ export default function Chart({
             </g>
           );
         })}
+        {min < 0 ? <line className="zero" x1={padL} x2={w - padR} y1={y(0)} y2={y(0)} /> : null}
         {labels.map((l, i) =>
           i % step === 0 || i === n - 1 ? (
-            <text key={i} className="axis" x={x(i)} y={H - 6} textAnchor="middle">{l}</text>
+            <text key={i} className="axis" x={x(i)} y={H - 8} textAnchor={i === 0 ? "start" : i === n - 1 ? "end" : "middle"}>{l}</text>
           ) : null,
         )}
         {series.map((s) => {

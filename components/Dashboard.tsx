@@ -3,12 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CHANNELS, TIMEZONE_LABEL, type Channel, shortName } from "@/lib/channels";
 import type { ChannelBlock, DailyPoint, RangeResolved } from "@/lib/types";
-import { monthOptions, deskTodayStr } from "@/lib/range";
+import { monthOptions, deskTodayStr, addDays } from "@/lib/range";
 import { dateFmt, fmtInt, fmtK, fmtUSD, fmtUSD0, fullDateFmt, greeting, rpmOf, trend } from "@/lib/format";
 import Chart, { EmptyChart } from "./Chart";
 
-type Page = "home" | "channel" | "imports";
-type Metric = "revenue" | "views" | "rpm" | "opex" | "net";
+type Page = "home" | "channel" | "costs" | "imports";
+type Metric = "revenue" | "views" | "rpm" | "net";
 
 type RangeState = { key: string; start: string; end: string };
 
@@ -34,7 +34,6 @@ function metricOf(row: DailyPoint | undefined, key: Metric): number | null {
   if (!row) return null;
   if (key === "views") return row.views;
   if (key === "revenue") return row.revenue;
-  if (key === "opex") return row.opex ?? null;
   if (key === "net") return row.net ?? null;
   if (row.rpm != null) return row.rpm;
   return rpmOf(row.views, row.revenue);
@@ -81,6 +80,7 @@ function opexMonthlyFor(id: string): number {
   if (id === "all") return CHANNELS.reduce((a, c) => a + c.monthlyOpexUsd, 0);
   return CHANNELS.find((c) => c.id === id)?.monthlyOpexUsd || 0;
 }
+
 
 function combine(blocks: ChannelBlock[]): DailyPoint[] {
   const acc = new Map<string, { views: number; revenue: number; opex: number; net: number; hasV: boolean; hasR: boolean; hasO: boolean; hasN: boolean }>();
@@ -152,7 +152,7 @@ function sourceBadge(b: ChannelBlock | undefined) {
 export default function Dashboard() {
   const [page, setPage] = useState<Page>("home");
   const [current, setCurrent] = useState<string>("all");
-  const [metric, setMetric] = useState<Metric>("revenue");
+  const [metric, setMetric] = useState<Metric>("net");
   const [shown, setShown] = useState<Set<string>>(() => new Set(CHANNELS.map((c) => c.id)));
   const [range, setRange] = useState<RangeState>({ key: "28d", start: "", end: "" });
   const [customStart, setCustomStart] = useState("");
@@ -216,17 +216,18 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    const s = customStart || "";
-    const e = customEnd || today;
     if (!customStart) {
-      const dt = new Date(now);
-      dt.setDate(dt.getDate() - 27);
-      setCustomStart(today.slice(0, 8) + String(Math.max(1, Number(today.slice(8)) - 27)).padStart(2, "0"));
+      setCustomStart(addDays(today, -27));
     }
     if (!customEnd) setCustomEnd(today);
     void load(range);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const id = window.setInterval(() => { void load(range); }, 5 * 60 * 1000);
+    return () => window.clearInterval(id);
+  }, [load, range]);
 
   const rangeLabel = rangeMeta?.label || (range.key === "28d" ? "Last 28 days" : range.key);
 
@@ -307,8 +308,6 @@ export default function Dashboard() {
   const viewsAll = rangeSums(combined, "views");
   const revAll = rangeSums(combined, "revenue");
   const rpmAll = rangeSums(combined, "rpm");
-  const opexAll = rangeSums(combined, "opex");
-  const netAll = rangeSums(combined, "net");
   const reporting = CHANNELS.filter((c) => (blocks[c.id]?.series || []).length > 0).length;
 
   const emptyCopy = (ch: Channel | null) => {
@@ -366,7 +365,7 @@ export default function Dashboard() {
       if (r.cur != null) { sum += r.cur; any = true; }
     });
     if (any) {
-      const label = metric === "views" ? "sum of views" : metric === "revenue" ? "sum of estimated revenue" : metric === "opex" ? "sum of opex" : metric === "net" ? "sum of net" : "sum";
+      const label = metric === "views" ? "sum of views" : metric === "revenue" ? "sum of gross revenue" : metric === "net" ? "sum of daily net" : "sum";
       overlayFoot = `${metric === "views" ? fmtK(sum) : fmtUSD0(sum)} ${label} · ${rangeLabel}`;
     }
   }
@@ -385,17 +384,27 @@ export default function Dashboard() {
         <nav className="nav">
           <button className="nav-item" aria-current={page === "home" ? "page" : undefined} onClick={() => setPage("home")}>
             <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-            Network
+            Home
           </button>
           <button className="nav-item" aria-current={page === "channel" ? "page" : undefined} onClick={() => setPage("channel")}>
             <svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
-            Channel
+            Channel detail
           </button>
-          <button className="nav-item" aria-current={page === "imports" ? "page" : undefined} onClick={() => setPage("imports")}>
-            <svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M4 19h16"/></svg>
-            CSV import
+          <button className="nav-item" aria-current={page === "costs" ? "page" : undefined} onClick={() => setPage("costs")}>
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9.5 9.5h3.5a1.5 1.5 0 0 1 0 3h-2a1.5 1.5 0 0 0 0 3h3.5"/></svg>
+            Cost breakdown
           </button>
         </nav>
+        <button
+          type="button"
+          className="csv-fab"
+          aria-label="CSV import"
+          title="CSV import"
+          aria-current={page === "imports" ? "page" : undefined}
+          onClick={() => setPage("imports")}
+        >
+          <svg viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m7 10 5-5 5 5"/></svg>
+        </button>
         <div className="side-user">
           <div className="avatar">I</div>
           <div><b>Network</b><span>{TIMEZONE_LABEL}</span></div>
@@ -472,9 +481,9 @@ export default function Dashboard() {
                     ))}
                   </div>
                   <div className="seg" role="group" aria-label="Metric">
-                    {(["revenue", "views", "rpm", "opex", "net"] as Metric[]).map((m) => (
+                    {(["net", "revenue", "views", "rpm"] as Metric[]).map((m) => (
                       <button key={m} className="seg-opt" aria-pressed={metric === m} onClick={() => setMetric(m)}>
-                        {m === "revenue" ? "Revenue" : m === "views" ? "Views" : m === "rpm" ? "RPM" : m === "opex" ? "Opex" : "Net"}
+                        {m === "revenue" ? "Gross revenue" : m === "views" ? "Views" : m === "rpm" ? "RPM" : "Net"}
                       </button>
                     ))}
                   </div>
@@ -532,6 +541,7 @@ export default function Dashboard() {
                       <div className="stat"><div className="kicker">Opex 100%</div><div className="num">{fmtUSD0(c.monthlyOpexUsd)}</div><small>{c.opexPeople.filter((x) => x.amount > 0).map((x) => `${x.name} $${x.amount}`).join(", ")}</small></div>
                       <div className="stat"><div className="kicker">Net, 100%</div><div className="num">{fmtUSD0(rangeSums(s, "net").cur)}</div><small>after {fmtUSD0(c.monthlyOpexUsd)} / mo</small></div>
                     </div>
+                    <div className="tags">{c.leagues.map((l) => <span className="tag" key={l}>{l}</span>)}</div>
                     <div className="actions">
                       <button className="btn btn-primary" type="button" onClick={() => { setCurrent(c.id); setPage("channel"); }}>Open detail</button>
                       <a className="btn" href={c.url} target="_blank" rel="noopener">YouTube ↗</a>
@@ -642,6 +652,35 @@ export default function Dashboard() {
                     </table>
                   </div>
                 </div>
+                {current !== "all" ? (
+                  <div className="card">
+                    <div className="card-head">
+                      <div>
+                        <h3>Leagues covered</h3>
+                        <div className="sub">Per channel</div>
+                      </div>
+                    </div>
+                    <div className="tags">
+                      {(CHANNELS.find((c) => c.id === current)?.leagues || []).map((l) => (
+                        <span className="tag tag-gold" key={l}>{l}</span>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="card">
+                    <div className="card-head">
+                      <div>
+                        <h3>Leagues covered</h3>
+                        <div className="sub">Across the three channels</div>
+                      </div>
+                    </div>
+                    <div className="tags">
+                      {[...new Set(CHANNELS.flatMap((c) => c.leagues))].map((l) => (
+                        <span className="tag tag-gold" key={l}>{l}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             <div className="card">
@@ -680,6 +719,56 @@ export default function Dashboard() {
                 ) : (
                   <div className="empty">{emptyCopy(current === "all" ? null : CHANNELS.find((c) => c.id === current) || null)}</div>
                 )}
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {page === "costs" ? (
+          <section className="page">
+            <div className="page-intro">
+              <h2>Costs</h2>
+              <span className="muted">People opex, USD / month · 100% channel</span>
+            </div>
+            <div className="grid-4">
+              <Kpi kind="dollar" value={fmtUSD0(CHANNELS.reduce((a, c) => a + c.monthlyOpexUsd, 0))} label="People opex, 100%" note="USD / month across 3 channels" />
+              <Kpi kind="trend" value={fmtUSD(CHANNELS.reduce((a, c) => a + c.monthlyOpexUsd, 0) / 30)} label="Daily opex, 100%" note="Monthly ÷ 30 · used in daily net" />
+              <Kpi kind="users" value={String(new Set(CHANNELS.flatMap((c) => c.opexPeople.map((p) => p.name))).size)} label="People" note="Named on the 100% sheet" />
+              <Kpi kind="pie" value={String(CHANNELS.length)} label="Channels" note="Allowlist only" />
+            </div>
+            <div className="card">
+              <div className="card-head">
+                <div>
+                  <h3>Rollup by channel</h3>
+                  <div className="sub">100% opex · people costs</div>
+                </div>
+              </div>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Channel</th>
+                      <th className="r">Opex 100%</th>
+                      <th>People</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {CHANNELS.map((c) => (
+                      <tr key={c.id}>
+                        <td className="b"><span className="ch-dot" style={{ background: c.color }} />{c.name}</td>
+                        <td className="r num">{fmtUSD(c.monthlyOpexUsd)}</td>
+                        <td className="muted" style={{ fontSize: 12.5 }}>{c.opexPeople.filter((p) => p.amount > 0).map((p) => `${p.name} ${fmtUSD(p.amount)}`).join(" · ")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td>Total people opex</td>
+                      <td className="r num">{fmtUSD(CHANNELS.reduce((a, c) => a + c.monthlyOpexUsd, 0))}</td>
+                      <td className="muted" style={{ fontWeight: 400, fontSize: 12.5 }}>USD / month · 100%</td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
             </div>
           </section>
