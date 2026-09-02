@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { CHANNELS, TIMEZONE, CURRENCY } from "@/lib/channels";
+import { CHANNELS, TIMEZONE_LABEL, CURRENCY } from "@/lib/channels";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   return NextResponse.json({
     ok: true,
-    timezone: TIMEZONE,
+    timezone: TIMEZONE_LABEL,
     currency: CURRENCY,
     channels: CHANNELS.map((c) => ({
       id: c.id,

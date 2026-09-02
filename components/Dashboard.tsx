@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CHANNELS, TIMEZONE, type Channel, shortName } from "@/lib/channels";
+import { CHANNELS, TIMEZONE_LABEL, type Channel, shortName } from "@/lib/channels";
 import type { ChannelBlock, DailyPoint, RangeResolved } from "@/lib/types";
-import { monthOptions, nicosiaTodayStr } from "@/lib/range";
+import { monthOptions, deskTodayStr } from "@/lib/range";
 import { dateFmt, fmtInt, fmtK, fmtUSD, fmtUSD0, fullDateFmt, greeting, rpmOf, trend } from "@/lib/format";
 import Chart, { EmptyChart } from "./Chart";
 
@@ -127,7 +127,7 @@ export default function Dashboard() {
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
 
-  const today = nicosiaTodayStr(now);
+  const today = deskTodayStr(now);
   const months = useMemo(() => monthOptions(now), [now]);
 
   const load = useCallback(async (r: RangeState, refresh = false) => {
@@ -323,7 +323,7 @@ export default function Dashboard() {
           <div className="brand-mark">L</div>
           <div>
             <div className="brand-name">LoL Network</div>
-            <div className="brand-sub">Investor desk</div>
+            <div className="brand-sub">Channel desk</div>
           </div>
         </div>
         <p className="nav-kicker">Desk</p>
@@ -347,14 +347,14 @@ export default function Dashboard() {
         </div>
         <div className="side-user">
           <div className="avatar">I</div>
-          <div><b>Investor</b><span>{TIMEZONE}</span></div>
+          <div><b>Network</b><span>{TIMEZONE_LABEL}</span></div>
         </div>
       </aside>
 
       <main className="desk">
         <header className="desk-header">
           <div>
-            <div className="kicker">{fullDateFmt.format(now)} · {TIMEZONE}</div>
+            <div className="kicker">{fullDateFmt.format(now)} · {TIMEZONE_LABEL}</div>
             <h1>{greeting(now)}</h1>
           </div>
           <div className="header-tools">
@@ -451,7 +451,7 @@ export default function Dashboard() {
 
             <div className="page-intro">
               <h2>Channels</h2>
-              <span className="muted">Allowlist only · 100% channel metrics · {TIMEZONE}</span>
+              <span className="muted">Allowlist only · 100% channel metrics · {TIMEZONE_LABEL}</span>
             </div>
             <div className="grid-3">
               {CHANNELS.map((c) => {
@@ -578,7 +578,7 @@ export default function Dashboard() {
             <div className="page-intro">
               <div>
                 <h2>CSV import</h2>
-                <div className="muted">Eventvods and Onivia · YouTube Studio daily export · {TIMEZONE}</div>
+                <div className="muted">Eventvods and Onivia · YouTube Studio daily export · {TIMEZONE_LABEL}</div>
               </div>
             </div>
             <div className="banner">

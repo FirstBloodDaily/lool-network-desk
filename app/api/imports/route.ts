@@ -88,6 +88,6 @@ export async function POST(req: Request) {
     rows: parsed.series.length,
     firstDate: parsed.series[0]?.date || null,
     lastDate: parsed.series[parsed.series.length - 1]?.date || null,
-    note: `Stored ${saved.name}. Investor UI uses parsed rows only — no sample numbers.`,
+    note: `Stored ${saved.name}. Desk uses parsed rows only — no sample numbers.`,
   });
 }

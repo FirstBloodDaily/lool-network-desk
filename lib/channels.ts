@@ -1,4 +1,5 @@
-export const TIMEZONE = "Asia/Nicosia" as const;
+export const TIMEZONE = "Europe/Athens" as const;
+export const TIMEZONE_LABEL = "GMT+2" as const;
 export const CURRENCY = "USD" as const;
 
 export type ChannelSource = "youtube-analytics" | "csv";

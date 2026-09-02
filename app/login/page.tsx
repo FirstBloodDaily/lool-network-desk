@@ -10,9 +10,9 @@ export default function LoginPage() {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <div className="kicker">LoL YouTube network</div>
-        <h1>Investor desk</h1>
-        <p className="muted">Password-gated. 100% network metrics only. Times in Asia/Nicosia.</p>
+        <div className="kicker">LoL Esports</div>
+        <h1>Network desk</h1>
+        <p className="muted">Password-gated. 100% network metrics only.</p>
         <Suspense fallback={<p className="muted">Loading…</p>}>
           <LoginForm usingDevDefault={usingDevDefault} />
         </Suspense>

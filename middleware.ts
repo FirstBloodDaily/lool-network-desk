@@ -24,7 +24,7 @@ export async function middleware(req: NextRequest) {
         {
           ok: false,
           error:
-            "INVESTOR_PASSWORD is not set. Refusing to serve data in production. Add it in Vercel env vars.",
+            "Site password is not set. Refusing to serve data in production.",
         },
         { status: 503 },
       );

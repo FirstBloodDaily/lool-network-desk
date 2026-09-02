@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         ok: false,
-        error: "INVESTOR_PASSWORD is not set. This desk will not serve data until it is configured.",
+        error: "Site password is not set. This desk will not serve data until it is configured.",
       },
       { status: 503 },
     );

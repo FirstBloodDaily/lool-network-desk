@@ -126,7 +126,7 @@ export function parseCsvText(filename: string, text: string, requestedChannel?: 
       example: true,
       channelIds: [],
       series: [],
-      error: "EXAMPLE file ignored — investor UI never uses sample numbers.",
+      error: "EXAMPLE file ignored — this desk never uses sample numbers.",
     };
   }
 

@@ -19,11 +19,19 @@ export function fmtInt(n: number | null | undefined): string {
   return Math.round(n).toLocaleString("en-US");
 }
 
+function compact(n: number, div: number, suffix: string): string {
+  const x = n / div;
+  const digits = Math.abs(x) >= 10 ? 1 : 2;
+  return x.toFixed(digits).replace(/\.0+$/, "").replace(/(\.[1-9])0$/, "$1") + suffix;
+}
+
 export function fmtK(n: number | null | undefined): string {
   if (n == null || Number.isNaN(n)) return "—";
-  return Math.abs(n) >= 1000
-    ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k"
-    : Math.round(n).toString();
+  const sign = n < 0 ? "−" : "";
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000) return sign + compact(abs, 1_000_000, "m");
+  if (abs >= 1000) return sign + compact(abs, 1000, "k");
+  return sign + String(Math.round(abs));
 }
 
 export const dateFmt = new Intl.DateTimeFormat("en-GB", {

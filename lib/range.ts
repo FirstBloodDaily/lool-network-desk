@@ -1,4 +1,4 @@
-import { TIMEZONE } from "./channels";
+import { TIMEZONE, TIMEZONE_LABEL } from "./channels";
 import type { RangeResolved } from "./types";
 
 const MONTH_RE = /^(\d{4})-(\d{2})$/;
@@ -7,7 +7,7 @@ function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-export function nicosiaParts(now = new Date()): { y: number; m: number; d: number } {
+export function deskDateParts(now = new Date()): { y: number; m: number; d: number } {
   const fmt = new Intl.DateTimeFormat("en-GB", {
     timeZone: TIMEZONE,
     year: "numeric",
@@ -23,8 +23,8 @@ export function ymd(y: number, m: number, d: number): string {
   return `${y}-${pad(m)}-${pad(d)}`;
 }
 
-export function nicosiaTodayStr(now = new Date()): string {
-  const { y, m, d } = nicosiaParts(now);
+export function deskTodayStr(now = new Date()): string {
+  const { y, m, d } = deskDateParts(now);
   return ymd(y, m, d);
 }
 
@@ -51,8 +51,8 @@ export function resolveRange(
   endS?: string | null,
   now = new Date(),
 ): RangeResolved {
-  const today = nicosiaTodayStr(now);
-  const { y, m } = nicosiaParts(now);
+  const today = deskTodayStr(now);
+  const { y, m } = deskDateParts(now);
   const key = (rangeKey || "28d").trim();
 
   let start: string;
@@ -106,11 +106,11 @@ export function resolveRange(
     });
   }
 
-  return { key, start, end, label, timezone: TIMEZONE };
+  return { key, start, end, label, timezone: TIMEZONE_LABEL };
 }
 
 export function monthOptions(now = new Date()): { key: string; label: string }[] {
-  const { y, m } = nicosiaParts(now);
+  const { y, m } = deskDateParts(now);
   const months = [
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December",

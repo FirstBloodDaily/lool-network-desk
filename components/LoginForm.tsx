@@ -38,7 +38,7 @@ export default function LoginForm({ usingDevDefault }: { usingDevDefault: boolea
   return (
     <form onSubmit={onSubmit}>
       {usingDevDefault ? (
-        <div className="banner">Local dev default password is <code>dev</code>. Set INVESTOR_PASSWORD for anything shared.</div>
+        <div className="banner">Local dev default password is <code>dev</code>. Set the site password env var for anything shared.</div>
       ) : null}
       <label className="kicker" htmlFor="password">Password</label>
       <input

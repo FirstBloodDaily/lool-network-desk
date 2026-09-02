@@ -16,6 +16,6 @@ export async function GET(req: Request) {
     setupRequired,
     usingDevDefault,
     youtubeConfigured: !!googleConfig(),
-    timezone: "Asia/Nicosia",
+    timezone: "GMT+2",
   });
 }

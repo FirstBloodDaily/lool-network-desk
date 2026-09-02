@@ -9,9 +9,9 @@ export default function SetupPage() {
     <div className="auth-page">
       <div className="auth-card">
         <div className="kicker">Setup required</div>
-        <h1>Investor desk is not configured</h1>
+        <h1>Network desk is not configured</h1>
         <p className="muted">
-          Production refuses to serve metrics until the investor password env var is set on the host.
+          Production refuses to serve metrics until the password env var is set on the host.
         </p>
         <div className="banner" style={{ marginTop: 18 }}>
           Vercel team Buv Hobby, project lol-network-desk: add the vars from env.example, then redeploy.
