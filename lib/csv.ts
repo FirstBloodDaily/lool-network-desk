@@ -246,8 +246,57 @@ export function saveCsv(channelId: string, originalName: string, text: string): 
   return { path: dest, name };
 }
 
+
+function storeChannelId(name: string): string | undefined {
+  const lower = name.toLowerCase();
+  if (lower.startsWith("eventvods-") || lower.includes("eventvods") || lower.includes("loleventvods")) return "eventvods";
+  if (lower.startsWith("onivia-") || lower.includes("onivia")) return "onivia";
+  return undefined;
+}
+
+function seedDir(): string {
+  return path.join(process.cwd(), "data", "seed");
+}
+
+function applyCsvFile(
+  dir: string,
+  name: string,
+  start: string | undefined,
+  end: string | undefined,
+  out: Record<string, ChannelBlock>,
+): void {
+  const full = path.join(dir, name);
+  let text: string;
+  try {
+    text = fs.readFileSync(full, "utf8");
+  } catch {
+    return;
+  }
+  const requested = storeChannelId(name);
+  const parsed = parseCsvText(name, text, requested);
+  if (parsed.example || !parsed.series.length) return;
+  const stat = fs.statSync(full);
+  const ids = parsed.channelIds.length ? parsed.channelIds : requested ? [requested] : [];
+  for (const cid of ids) {
+    if (!out[cid]) continue;
+    const series = start && end ? filterSeries(parsed.series, start, end) : parsed.series;
+    out[cid] = {
+      channelId: cid,
+      youtubeChannelId: CHANNELS.find((c) => c.id === cid)!.youtubeChannelId,
+      source: "csv",
+      ok: true,
+      series,
+      note: series.length
+        ? `CSV · YouTube Studio · ${name}`
+        : "CSV is on file but has no rows in this range.",
+      error: null,
+      file: name,
+      uploadedAt: stat.mtime.toISOString(),
+    };
+  }
+}
+
 export function loadImports(start?: string, end?: string): Record<string, ChannelBlock> {
-  const dir = uploadsDir();
   const out: Record<string, ChannelBlock> = {};
   for (const ch of CHANNELS) {
     if (!CSV_CHANNEL_IDS.has(ch.id)) continue;
@@ -263,42 +312,16 @@ export function loadImports(start?: string, end?: string): Record<string, Channe
       uploadedAt: null,
     };
   }
-  if (!fs.existsSync(dir)) return out;
-
-  const files = fs
-    .readdirSync(dir)
-    .filter((f) => f.endsWith(".csv") || f.endsWith(".tsv"))
-    .sort();
-
-  for (const name of files) {
-    if (isExampleFile(name, "")) continue;
-    const full = path.join(dir, name);
-    let text: string;
-    try {
-      text = fs.readFileSync(full, "utf8");
-    } catch {
-      continue;
-    }
-    const parsed = parseCsvText(name, text);
-    if (parsed.example || parsed.error || !parsed.series.length) continue;
-    const stat = fs.statSync(full);
-    for (const cid of parsed.channelIds) {
-      if (!out[cid]) continue;
-      const series = start && end ? filterSeries(parsed.series, start, end) : parsed.series;
-      out[cid] = {
-        channelId: cid,
-        youtubeChannelId: CHANNELS.find((c) => c.id === cid)!.youtubeChannelId,
-        source: "csv",
-        ok: true,
-        series,
-        note: series.length
-          ? `CSV · YouTube Studio · ${name}`
-          : "CSV is on file but has no rows in this range.",
-        error: null,
-        file: name,
-        uploadedAt: stat.mtime.toISOString(),
-      };
-    }
+  const dirs = [seedDir(), uploadsDir()];
+  for (const dir of dirs) {
+    if (!fs.existsSync(dir)) continue;
+    const files = fs
+      .readdirSync(dir)
+      .filter((f) => f.endsWith(".csv") || f.endsWith(".tsv"))
+      .filter((f) => !isExampleFile(f, ""));
+    files.sort();
+    files.sort((a, b) => Number(a.includes("-latest.")) - Number(b.includes("-latest.")));
+    for (const name of files) applyCsvFile(dir, name, start, end, out);
   }
   return out;
 }
