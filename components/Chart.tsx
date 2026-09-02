@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 export type Series = {
   name: string;
@@ -34,29 +34,50 @@ export default function Chart({
   tall?: boolean;
 }) {
   const wrap = useRef<HTMLDivElement>(null);
-  const [w, setW] = useState(640);
+  const [w, setW] = useState(0);
   const [tip, setTip] = useState<{ x: number; y: number; label: string; items: TipItem[]; flipLeft?: boolean } | null>(null);
 
-  useEffect(() => {
-    const el = wrap.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => setW(el.clientWidth || 640));
-    ro.observe(el);
-    setW(el.clientWidth || 640);
-    return () => ro.disconnect();
-  }, []);
-
-  const tick = formatTick || fmtDefault;
-  const tipFmt = formatTip || tick;
   const allVals: number[] = [];
   series.forEach((s) => (s.values || []).forEach((v) => { if (v != null && Number.isFinite(v)) allVals.push(v); }));
   const n = labels.length;
+  const hasData = n > 0 && allVals.length > 0;
+  const H = tall ? 340 : 240;
 
-  if (!n || !allVals.length) {
-    return <div className={`chart ${tall ? "tall" : ""}`}>{empty || <EmptyChart>No data for this range.</EmptyChart>}</div>;
+  useLayoutEffect(() => {
+    const el = wrap.current;
+    if (!el) return;
+    const measure = () => {
+      const next = Math.round(el.getBoundingClientRect().width);
+      if (next > 0) setW((prev) => (Math.abs(prev - next) > 1 ? next : prev));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      measure();
+      inner = requestAnimationFrame(measure);
+    });
+    window.addEventListener("resize", measure);
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+      window.removeEventListener("resize", measure);
+    };
+  }, [hasData, tall, n]);
+
+  const tick = formatTick || fmtDefault;
+  const tipFmt = formatTip || tick;
+
+  if (!hasData || w < 40) {
+    return (
+      <div className={`chart ${tall ? "tall" : ""}`} ref={wrap}>
+        {hasData ? null : (empty || <EmptyChart>No data for this range.</EmptyChart>)}
+      </div>
+    );
   }
 
-  const H = tall ? 340 : 240;
   const padL = 58, padR = 18, padT = 14, padB = 32;
   const innerW = Math.max(w - padL - padR, 40);
   const innerH = H - padT - padB;
@@ -92,9 +113,14 @@ export default function Chart({
     setTip({ x: ev.clientX - rect.left, y: ev.clientY - rect.top, label: labels[best], items, flipLeft });
   }
 
+  const idxs: number[] = [];
+  for (let i = 0; i < n; i++) if (i % step === 0) idxs.push(i);
+  if (n > 1 && idxs[idxs.length - 1] !== n - 1) idxs.push(n - 1);
+  if (idxs.length >= 2 && idxs[idxs.length - 1] - idxs[idxs.length - 2] < 3) idxs.splice(idxs.length - 2, 1);
+
   return (
     <div className={`chart ${tall ? "tall" : ""}`} ref={wrap}>
-      <svg width={w} height={H} onMouseMove={onMove} onMouseLeave={() => setTip(null)}>
+      <svg width="100%" height={H} viewBox={`0 0 ${w} ${H}`} preserveAspectRatio="xMidYMid meet" onMouseMove={onMove} onMouseLeave={() => setTip(null)}>
         {Array.from({ length: ticks + 1 }, (_, t) => {
           const v = min + ((max - min) * t) / ticks;
           return (
@@ -105,15 +131,9 @@ export default function Chart({
           );
         })}
         {min < 0 ? <line className="zero" x1={padL} x2={w - padR} y1={y(0)} y2={y(0)} /> : null}
-        {(() => {
-          const idxs: number[] = [];
-          for (let i = 0; i < n; i++) if (i % step === 0) idxs.push(i);
-          if (n > 1 && idxs[idxs.length - 1] !== n - 1) idxs.push(n - 1);
-          if (idxs.length >= 2 && idxs[idxs.length - 1] - idxs[idxs.length - 2] < 3) idxs.splice(idxs.length - 2, 1);
-          return idxs.map((i) => (
-            <text key={i} className="axis" x={x(i)} y={H - 8} textAnchor={i === 0 ? "start" : i === n - 1 ? "end" : "middle"}>{labels[i]}</text>
-          ));
-        })()}
+        {idxs.map((i) => (
+          <text key={i} className="axis" x={x(i)} y={H - 8} textAnchor={i === 0 ? "start" : i === n - 1 ? "end" : "middle"}>{labels[i]}</text>
+        ))}
         {series.map((s) => {
           let d = "", started = false;
           const dots: React.ReactNode[] = [];

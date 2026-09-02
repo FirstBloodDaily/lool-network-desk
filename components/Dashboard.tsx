@@ -58,10 +58,11 @@ function rangeSums(series: DailyPoint[], key: Metric): { cur: number | null; pre
 
 function attachCosts(ch: Channel, series: DailyPoint[]): DailyPoint[] {
   const day = ch.monthlyOpexUsd / 30;
+  const keep = 1 - (ch.networkCutPct || 0) / 100;
   return series.map((r) => {
     const has = r.revenue != null || r.views != null;
     const opex = has ? day : null;
-    const net = r.revenue == null ? null : r.revenue - day;
+    const net = r.revenue == null ? null : r.revenue * keep - day;
     return { ...r, opex, net };
   });
 }
@@ -154,6 +155,7 @@ export default function Dashboard() {
   const [current, setCurrent] = useState<string>("all");
   const [metric, setMetric] = useState<Metric>("net");
   const [shown, setShown] = useState<Set<string>>(() => new Set(CHANNELS.map((c) => c.id)));
+  const [combineAll, setCombineAll] = useState(false);
   const [range, setRange] = useState<RangeState>({ key: "28d", start: "", end: "" });
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
@@ -251,6 +253,7 @@ export default function Dashboard() {
   }
 
   function toggleCh(id: string) {
+    setCombineAll(false);
     setShown((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
@@ -301,7 +304,8 @@ export default function Dashboard() {
   const overlayShown = overlayChannels.length ? overlayChannels : CHANNELS;
   const overlayDates = (() => {
     const set = new Set<string>();
-    overlayShown.forEach((c) => seriesFor(c.id).forEach((r) => { if (r.date) set.add(r.date.slice(0, 10)); }));
+    const src = combineAll ? [seriesFor("all")] : overlayShown.map((c) => seriesFor(c.id));
+    src.forEach((series) => series.forEach((r) => { if (r.date) set.add(r.date.slice(0, 10)); }));
     return [...set].sort();
   })();
 
@@ -352,19 +356,32 @@ export default function Dashboard() {
   let overlayFoot = "";
   if (metric === "rpm") {
     let rev = 0, views = 0, any = false;
-    overlayShown.forEach((c) => {
-      seriesFor(c.id).forEach((r) => {
+    const rpmSeries = combineAll ? seriesFor("all") : null;
+    if (rpmSeries) {
+      rpmSeries.forEach((r) => {
         if (r.revenue != null) { rev += r.revenue; any = true; }
         if (r.views) views += r.views;
       });
-    });
+    } else {
+      overlayShown.forEach((c) => {
+        seriesFor(c.id).forEach((r) => {
+          if (r.revenue != null) { rev += r.revenue; any = true; }
+          if (r.views) views += r.views;
+        });
+      });
+    }
     overlayFoot = any && views ? `${fmtUSD((rev / views) * 1000)} blended RPM · ${rangeLabel}` : "";
   } else {
     let sum = 0, any = false;
-    overlayShown.forEach((c) => {
-      const r = rangeSums(seriesFor(c.id), metric);
-      if (r.cur != null) { sum += r.cur; any = true; }
-    });
+    if (combineAll) {
+      const r = rangeSums(seriesFor("all"), metric);
+      if (r.cur != null) { sum = r.cur; any = true; }
+    } else {
+      overlayShown.forEach((c) => {
+        const r = rangeSums(seriesFor(c.id), metric);
+        if (r.cur != null) { sum += r.cur; any = true; }
+      });
+    }
     if (any) {
       const label = metric === "views" ? "sum of views" : metric === "revenue" ? "sum of gross revenue" : metric === "net" ? "sum of daily net" : "sum";
       overlayFoot = `${metric === "views" ? fmtK(sum) : fmtUSD0(sum)} ${label} · ${rangeLabel}`;
@@ -467,18 +484,24 @@ export default function Dashboard() {
               <div className="card-head">
                 <div>
                   <h3>Compare channels</h3>
-                  <div className="sub">{rangeLabel} · 100% network · {overlayShown.map(shortName).join(" · ")}</div>
+                  <div className="sub">{rangeLabel} · 100% network · {combineAll ? "all channels combined" : overlayShown.map(shortName).join(" · ")}</div>
                 </div>
                 <div className="head-actions">
                   <div className="seg" role="group" aria-label="Channels on the chart">
+                    <button
+                      className="seg-opt"
+                      aria-pressed={combineAll}
+                      onClick={() => setCombineAll(true)}
+                    >
+                      All
+                    </button>
                     {CHANNELS.map((c) => (
                       <button
                         key={c.id}
                         className="seg-opt"
                         data-ch={c.id}
-                        aria-pressed={shown.has(c.id)}
+                        aria-pressed={!combineAll && shown.has(c.id)}
                         onClick={() => toggleCh(c.id)}
-                        
                       >
                         {shortName(c)}
                       </button>
@@ -496,20 +519,33 @@ export default function Dashboard() {
               <Chart
                 tall
                 labels={overlayDates.map(shortLabel)}
-                series={overlayShown.map((c) => ({
-                  name: shortName(c),
-                  color: c.color,
-                  values: overlayDates.map((d) => {
-                    const row = seriesFor(c.id).find((r) => r.date.slice(0, 10) === d);
-                    return metricOf(row, metric);
-                  }),
-                }))}
+                series={combineAll
+                  ? [{
+                      name: "All channels",
+                      color: "#1e3b2f",
+                      values: overlayDates.map((d) => {
+                        const row = seriesFor("all").find((r) => r.date.slice(0, 10) === d);
+                        return metricOf(row, metric);
+                      }),
+                    }]
+                  : overlayShown.map((c) => ({
+                      name: shortName(c),
+                      color: c.color,
+                      values: overlayDates.map((d) => {
+                        const row = seriesFor(c.id).find((r) => r.date.slice(0, 10) === d);
+                        return metricOf(row, metric);
+                      }),
+                    }))}
                 formatTick={(v) => fmtTick(metric, v)}
                 formatTip={(v) => fmtTip(metric, v)}
                 empty={<EmptyChart>{loading ? "Loading…" : "No daily series for this range. Empty until live Analytics or a real Studio CSV."}</EmptyChart>}
               />
               <div className="legend">
-                {CHANNELS.map((c) => (
+                {combineAll ? (
+                  <span className="on">
+                    <i style={{ background: "#1e3b2f" }} />All channels
+                  </span>
+                ) : CHANNELS.map((c) => (
                   <span key={c.id} data-ch={c.id} className={shown.has(c.id) ? "on" : ""} onClick={() => toggleCh(c.id)}>
                     <i style={{ background: c.color }} />{shortName(c)}
                   </span>
@@ -585,7 +621,7 @@ export default function Dashboard() {
               />
               <Kpi kind="eye" value={fmtK(chViews.cur)} label={`Views · ${rangeLabel}`} note="Not split by share" cur={chViews.cur} prev={chViews.prev} />
               <Kpi kind="trend" value={fmtUSD(chRpm.cur)} label={`RPM, 100% · ${rangeLabel}`} note="Revenue per 1,000 views" cur={chRpm.cur} prev={chRpm.prev} />
-              <Kpi kind="pie" value={fmtUSD0(chNet.cur)} label={`Net, 100% · ${rangeLabel}`} note={`after ${fmtUSD0(chOpexMo)} opex`} cur={chNet.cur} prev={chNet.prev} />
+              <Kpi kind="pie" value={fmtUSD0(chNet.cur)} label={`Net, 100% · ${rangeLabel}`} note={`after MCN cut + ${fmtUSD0(chOpexMo)} opex`} cur={chNet.cur} prev={chNet.prev} />
             </div>
             <div className="grid-main">
               <div className="chart-grid">
@@ -593,7 +629,7 @@ export default function Dashboard() {
                   { m: "revenue" as Metric, title: "Revenue", sub: current === "all" ? "100% channel gross · combined" : "100% channel gross" },
                   { m: "views" as Metric, title: "Views", sub: "Views are not split — same as gross" },
                   { m: "rpm" as Metric, title: "RPM", sub: current === "all" ? "100% channel · combined" : "100% channel" },
-                  { m: "net" as Metric, title: "Daily net", sub: current === "all" ? "Sum of (revenue − opex ÷ 30) per channel that has revenue that day" : `Channel revenue − ${fmtUSD0(chOpexMo)} ÷ 30 = ${fmtUSD(chOpexMo / 30)} / day` },
+                  { m: "net" as Metric, title: "Daily net", sub: current === "all" ? "Sum of (revenue after MCN cut − opex ÷ 30) per channel that has revenue that day" : `Channel revenue − ${fmtUSD0(chOpexMo)} ÷ 30 = ${fmtUSD(chOpexMo / 30)} / day` },
                 ]).map((card) => (
                   <div className="card" key={card.m}>
                     <div className="card-head">
@@ -691,7 +727,7 @@ export default function Dashboard() {
               <div className="card-head">
                 <div>
                   <h3>Daily net table</h3>
-                  <div className="sub">Last 14 days · daily net, 100% = estimated revenue − monthly opex ÷ 30</div>
+                  <div className="sub">Last 14 days · daily net = estimated revenue after MCN cut − monthly opex ÷ 30</div>
                 </div>
               </div>
               <div className="table-wrap">
