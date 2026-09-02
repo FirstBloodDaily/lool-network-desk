@@ -3,6 +3,8 @@ export type DailyPoint = {
   views: number | null;
   revenue: number | null;
   rpm: number | null;
+  opex?: number | null;
+  net?: number | null;
 };
 
 export type ChannelBlock = {

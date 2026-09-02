@@ -35,7 +35,7 @@ export default function Chart({
 }) {
   const wrap = useRef<HTMLDivElement>(null);
   const [w, setW] = useState(640);
-  const [tip, setTip] = useState<{ x: number; y: number; label: string; items: TipItem[] } | null>(null);
+  const [tip, setTip] = useState<{ x: number; y: number; label: string; items: TipItem[]; flipLeft?: boolean } | null>(null);
 
   useEffect(() => {
     const el = wrap.current;
@@ -88,7 +88,8 @@ export default function Chart({
       })
       .filter((x): x is TipItem => !!x);
     if (!items.length) { setTip(null); return; }
-    setTip({ x: ev.clientX - rect.left, y: ev.clientY - rect.top, label: labels[best], items });
+    const flipLeft = n > 1 && best >= Math.max(n - 4, Math.floor(n * 0.72));
+    setTip({ x: ev.clientX - rect.left, y: ev.clientY - rect.top, label: labels[best], items, flipLeft });
   }
 
   return (
@@ -129,7 +130,7 @@ export default function Chart({
         {tip ? <line className="hover-rule" x1={x(labels.indexOf(tip.label))} x2={x(labels.indexOf(tip.label))} y1={padT} y2={H - padB} /> : null}
       </svg>
       {tip ? (
-        <div className="chart-tip" style={{ left: tip.x, top: tip.y, transform: "translate(8px, -110%)" }}>
+        <div className={"chart-tip" + (tip.flipLeft ? " chart-tip-left" : "")} style={{ left: tip.x, top: tip.y, transform: tip.flipLeft ? "translate(calc(-100% - 10px), -110%)" : "translate(8px, -110%)" }}>
           <div className="tip-date">{tip.label}</div>
           {tip.items.map((it) => (
             <div className="tip-row" key={it.name}>

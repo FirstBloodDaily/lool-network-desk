@@ -8,11 +8,11 @@ import { dateFmt, fmtInt, fmtK, fmtUSD, fmtUSD0, fullDateFmt, greeting, rpmOf, t
 import Chart, { EmptyChart } from "./Chart";
 
 type Page = "home" | "channel" | "imports";
-type Metric = "revenue" | "views" | "rpm";
+type Metric = "revenue" | "views" | "rpm" | "opex" | "net";
 
 type RangeState = { key: string; start: string; end: string };
 
-function icon(kind: "eye" | "dollar" | "trend" | "users") {
+function icon(kind: "eye" | "dollar" | "trend" | "users" | "pie") {
   if (kind === "eye") return (
     <svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
   );
@@ -21,6 +21,9 @@ function icon(kind: "eye" | "dollar" | "trend" | "users") {
   );
   if (kind === "trend") return (
     <svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>
+  );
+  if (kind === "pie") return (
+    <svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9h-9V3z"/><path d="M12 3a9 9 0 0 1 9 9h-9V3z"/></svg>
   );
   return (
     <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
@@ -31,6 +34,8 @@ function metricOf(row: DailyPoint | undefined, key: Metric): number | null {
   if (!row) return null;
   if (key === "views") return row.views;
   if (key === "revenue") return row.revenue;
+  if (key === "opex") return row.opex ?? null;
+  if (key === "net") return row.net ?? null;
   if (row.rpm != null) return row.rpm;
   return rpmOf(row.views, row.revenue);
 }
@@ -52,23 +57,57 @@ function rangeSums(series: DailyPoint[], key: Metric): { cur: number | null; pre
   return { cur: sum(usable), prev, empty: false };
 }
 
+function attachCosts(ch: Channel, series: DailyPoint[]): DailyPoint[] {
+  const day = ch.monthlyOpexUsd / 30;
+  return series.map((r) => {
+    const has = r.revenue != null || r.views != null;
+    const opex = has ? day : null;
+    const net = r.revenue == null ? null : r.revenue - day;
+    return { ...r, opex, net };
+  });
+}
+
+
+function opexPeopleFor(id: string): { name: string; amount: number }[] {
+  if (id === "all") {
+    const acc = new Map<string, number>();
+    CHANNELS.forEach((c) => c.opexPeople.forEach((p) => acc.set(p.name, (acc.get(p.name) || 0) + p.amount)));
+    return [...acc.entries()].map(([name, amount]) => ({ name, amount }));
+  }
+  return CHANNELS.find((c) => c.id === id)?.opexPeople || [];
+}
+
+function opexMonthlyFor(id: string): number {
+  if (id === "all") return CHANNELS.reduce((a, c) => a + c.monthlyOpexUsd, 0);
+  return CHANNELS.find((c) => c.id === id)?.monthlyOpexUsd || 0;
+}
+
 function combine(blocks: ChannelBlock[]): DailyPoint[] {
-  const acc = new Map<string, { views: number; revenue: number; hasV: boolean; hasR: boolean }>();
+  const acc = new Map<string, { views: number; revenue: number; opex: number; net: number; hasV: boolean; hasR: boolean; hasO: boolean; hasN: boolean }>();
   blocks.forEach((b) => {
     (b.series || []).forEach((r) => {
-      const d = (r.date || "").slice(0, 10);
-      if (!d) return;
-      if (!acc.has(d)) acc.set(d, { views: 0, revenue: 0, hasV: false, hasR: false });
-      const a = acc.get(d)!;
+      const day = (r.date || "").slice(0, 10);
+      if (!day) return;
+      if (!acc.has(day)) acc.set(day, { views: 0, revenue: 0, opex: 0, net: 0, hasV: false, hasR: false, hasO: false, hasN: false });
+      const a = acc.get(day)!;
       if (r.views != null) { a.views += r.views; a.hasV = true; }
       if (r.revenue != null) { a.revenue += r.revenue; a.hasR = true; }
+      if (r.opex != null) { a.opex += r.opex; a.hasO = true; }
+      if (r.net != null) { a.net += r.net; a.hasN = true; }
     });
   });
-  return [...acc.keys()].sort().map((d) => {
-    const a = acc.get(d)!;
+  return [...acc.keys()].sort().map((day) => {
+    const a = acc.get(day)!;
     const views = a.hasV ? a.views : null;
     const revenue = a.hasR ? a.revenue : null;
-    return { date: d, views, revenue, rpm: rpmOf(views, revenue) };
+    return {
+      date: day,
+      views,
+      revenue,
+      rpm: rpmOf(views, revenue),
+      opex: a.hasO ? a.opex : null,
+      net: a.hasN ? a.net : null,
+    };
   });
 }
 
@@ -85,7 +124,7 @@ function TrendPill({ cur, prev }: { cur: number | null; prev: number | null }) {
 function Kpi({
   kind, value, label, note, cur, prev,
 }: {
-  kind: "eye" | "dollar" | "trend" | "users";
+  kind: "eye" | "dollar" | "trend" | "users" | "pie";
   value: string;
   label: string;
   note: string;
@@ -192,8 +231,17 @@ export default function Dashboard() {
   const rangeLabel = rangeMeta?.label || (range.key === "28d" ? "Last 28 days" : range.key);
 
   function seriesFor(id: string): DailyPoint[] {
-    if (id === "all") return combine(CHANNELS.map((c) => blocks[c.id]).filter(Boolean));
-    return blocks[id]?.series || [];
+    if (id === "all") {
+      return combine(
+        CHANNELS.map((c) => ({
+          ...(blocks[c.id] || { series: [] as DailyPoint[] }),
+          series: attachCosts(c, blocks[c.id]?.series || []),
+        })) as ChannelBlock[],
+      );
+    }
+    const ch = CHANNELS.find((c) => c.id === id);
+    if (!ch) return [];
+    return attachCosts(ch, blocks[id]?.series || []);
   }
 
   function blockFor(id: string): ChannelBlock | undefined {
@@ -259,6 +307,8 @@ export default function Dashboard() {
   const viewsAll = rangeSums(combined, "views");
   const revAll = rangeSums(combined, "revenue");
   const rpmAll = rangeSums(combined, "rpm");
+  const opexAll = rangeSums(combined, "opex");
+  const netAll = rangeSums(combined, "net");
   const reporting = CHANNELS.filter((c) => (blocks[c.id]?.series || []).length > 0).length;
 
   const emptyCopy = (ch: Channel | null) => {
@@ -282,7 +332,11 @@ export default function Dashboard() {
   const chViews = rangeSums(chSeries, "views");
   const chRev = rangeSums(chSeries, "revenue");
   const chRpm = rangeSums(chSeries, "rpm");
+  const chNet = rangeSums(chSeries, "net");
+  const chPeople = opexPeopleFor(current === "all" ? "all" : chObj.id);
+  const chOpexMo = opexMonthlyFor(current === "all" ? "all" : chObj.id);
   const chLabels = chSeries.map((r) => shortLabel(r.date));
+  const chLive = current === "all" ? blocks.oplol?.source === "live" : blockFor(current)?.source === "live";
 
   function fmtTick(m: Metric, v: number) {
     if (m === "views") return fmtK(v);
@@ -312,7 +366,8 @@ export default function Dashboard() {
       if (r.cur != null) { sum += r.cur; any = true; }
     });
     if (any) {
-      overlayFoot = `${metric === "views" ? fmtK(sum) : fmtUSD0(sum)} ${metric === "revenue" ? "sum of estimated revenue" : "sum of views"} · ${rangeLabel}`;
+      const label = metric === "views" ? "sum of views" : metric === "revenue" ? "sum of estimated revenue" : metric === "opex" ? "sum of opex" : metric === "net" ? "sum of net" : "sum";
+      overlayFoot = `${metric === "views" ? fmtK(sum) : fmtUSD0(sum)} ${label} · ${rangeLabel}`;
     }
   }
 
@@ -341,10 +396,6 @@ export default function Dashboard() {
             CSV import
           </button>
         </nav>
-        <div className="side-note">
-          <div className="side-note-title">100% network</div>
-          <p>Views, estimated revenue USD, RPM. No ownership split. OPLOLReplay can be live later; Eventvods and Onivia use Studio CSV until Owner.</p>
-        </div>
         <div className="side-user">
           <div className="avatar">I</div>
           <div><b>Network</b><span>{TIMEZONE_LABEL}</span></div>
@@ -408,15 +459,22 @@ export default function Dashboard() {
                 <div className="head-actions">
                   <div className="seg" role="group" aria-label="Channels on the chart">
                     {CHANNELS.map((c) => (
-                      <button key={c.id} className="seg-opt" data-ch={c.id} aria-pressed={shown.has(c.id)} onClick={() => toggleCh(c.id)}>
+                      <button
+                        key={c.id}
+                        className="seg-opt"
+                        data-ch={c.id}
+                        aria-pressed={shown.has(c.id)}
+                        onClick={() => toggleCh(c.id)}
+                        style={shown.has(c.id) ? { background: c.color, color: c.id === "oplol" ? "#1e3b2f" : "#fff" } : undefined}
+                      >
                         {shortName(c)}
                       </button>
                     ))}
                   </div>
                   <div className="seg" role="group" aria-label="Metric">
-                    {(["revenue", "views", "rpm"] as Metric[]).map((m) => (
+                    {(["revenue", "views", "rpm", "opex", "net"] as Metric[]).map((m) => (
                       <button key={m} className="seg-opt" aria-pressed={metric === m} onClick={() => setMetric(m)}>
-                        {m === "revenue" ? "Revenue" : m === "views" ? "Views" : "RPM"}
+                        {m === "revenue" ? "Revenue" : m === "views" ? "Views" : m === "rpm" ? "RPM" : m === "opex" ? "Opex" : "Net"}
                       </button>
                     ))}
                   </div>
@@ -470,9 +528,9 @@ export default function Dashboard() {
                     </div>
                     <div className="stat-row">
                       <div className="stat"><div className="kicker">Views</div><div className="num">{fmtK(v.cur)}</div><small>{rangeLabel}</small></div>
-                      <div className="stat"><div className="kicker">Est. revenue</div><div className="num">{fmtUSD0(r.cur)}</div><small>USD</small></div>
-                      <div className="stat"><div className="kicker">RPM</div><div className="num">{fmtUSD(p.cur)}</div><small>per 1,000 views</small></div>
-                      <div className="stat"><div className="kicker">Source</div><div className="num" style={{ fontSize: 16 }}>{c.source === "youtube-analytics" ? "Live API" : "CSV"}</div><small>{b?.note || (c.source === "csv" ? "Until Owner Analytics" : "When Google env is set")}</small></div>
+                      <div className="stat"><div className="kicker">Est. revenue</div><div className="num">{fmtUSD0(r.cur)}</div><small>USD · 100%</small></div>
+                      <div className="stat"><div className="kicker">Opex 100%</div><div className="num">{fmtUSD0(c.monthlyOpexUsd)}</div><small>{c.opexPeople.filter((x) => x.amount > 0).map((x) => `${x.name} $${x.amount}`).join(", ")}</small></div>
+                      <div className="stat"><div className="kicker">Net, 100%</div><div className="num">{fmtUSD0(rangeSums(s, "net").cur)}</div><small>after {fmtUSD0(c.monthlyOpexUsd)} / mo</small></div>
                     </div>
                     <div className="actions">
                       <button className="btn btn-primary" type="button" onClick={() => { setCurrent(c.id); setPage("channel"); }}>Open detail</button>
@@ -502,45 +560,95 @@ export default function Dashboard() {
                 {current === "all" ? <span className="live-badge">Combined</span> : sourceBadge(blockFor(current))}
               </div>
             </div>
-            <div className="grid-4" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
-              <Kpi kind="dollar" value={fmtUSD0(chRev.cur)} label={`Revenue, 100% · ${rangeLabel}`} note={current === "all" ? "Combined estimated revenue" : emptyCopy(current === "all" ? null : CHANNELS.find((c) => c.id === current) || null)} cur={chRev.cur} prev={chRev.prev} />
-              <Kpi kind="eye" value={fmtK(chViews.cur)} label={`Views · ${rangeLabel}`} note="Not split" cur={chViews.cur} prev={chViews.prev} />
+            <div className="grid-4">
+              <Kpi
+                kind="dollar"
+                value={fmtUSD0(chRev.cur)}
+                label={`Revenue, 100% · ${rangeLabel}`}
+                note={current === "all" ? "Combined estimated revenue" : (chLive ? "YouTube Analytics · allowlisted channel" : emptyCopy(CHANNELS.find((c) => c.id === current) || null))}
+                cur={chRev.cur}
+                prev={chRev.prev}
+              />
+              <Kpi kind="eye" value={fmtK(chViews.cur)} label={`Views · ${rangeLabel}`} note="Not split by share" cur={chViews.cur} prev={chViews.prev} />
               <Kpi kind="trend" value={fmtUSD(chRpm.cur)} label={`RPM, 100% · ${rangeLabel}`} note="Revenue per 1,000 views" cur={chRpm.cur} prev={chRpm.prev} />
+              <Kpi kind="pie" value={fmtUSD0(chNet.cur)} label={`Net, 100% · ${rangeLabel}`} note={`after ${fmtUSD0(chOpexMo)} opex`} cur={chNet.cur} prev={chNet.prev} />
             </div>
-            <div className="chart-grid">
-              {(["revenue", "views", "rpm"] as Metric[]).map((m) => (
-                <div className="card" key={m}>
+            <div className="grid-main">
+              <div className="chart-grid">
+                {([
+                  { m: "revenue" as Metric, title: "Revenue", sub: current === "all" ? "100% channel gross · combined" : "100% channel gross" },
+                  { m: "views" as Metric, title: "Views", sub: "Views are not split — same as gross" },
+                  { m: "rpm" as Metric, title: "RPM", sub: current === "all" ? "100% channel · combined" : "100% channel" },
+                  { m: "net" as Metric, title: "Daily net", sub: current === "all" ? "Sum of (revenue − opex ÷ 30) per channel that has revenue that day" : `Channel revenue − ${fmtUSD0(chOpexMo)} ÷ 30 = ${fmtUSD(chOpexMo / 30)} / day` },
+                ]).map((card) => (
+                  <div className="card" key={card.m}>
+                    <div className="card-head">
+                      <div>
+                        <h3>{card.title}</h3>
+                        <div className="sub">{card.sub}</div>
+                      </div>
+                      {chLive ? <span className="live-badge">Live · YouTube</span> : current !== "all" ? sourceBadge(blockFor(current)) : null}
+                    </div>
+                    <Chart
+                      labels={chLabels}
+                      series={[{
+                        name: chObj.name,
+                        color: "color" in chObj ? chObj.color : "#1e3b2f",
+                        values: chSeries.map((r) => metricOf(r, card.m)),
+                      }]}
+                      formatTick={(v) => fmtTick(card.m, v)}
+                      formatTip={(v) => fmtTip(card.m, v)}
+                      empty={<EmptyChart>{emptyCopy(current === "all" ? null : CHANNELS.find((x) => x.id === current) || null)}</EmptyChart>}
+                    />
+                    <div className="chart-foot">
+                      <div>
+                        <span className="big">{card.m === "views" ? fmtK(rangeSums(chSeries, card.m).cur) : card.m === "rpm" ? fmtUSD(rangeSums(chSeries, card.m).cur) : fmtUSD0(rangeSums(chSeries, card.m).cur)}</span>
+                        <span> {rangeLabel}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="chart-grid-stack">
+                <div className="card card-dark">
                   <div className="card-head">
                     <div>
-                      <h3>{m === "revenue" ? "Revenue" : m === "views" ? "Views" : "RPM"}</h3>
-                      <div className="sub">100% channel{current === "all" ? " · combined" : ""}</div>
+                      <h3>Opex by person</h3>
+                      <div className="muted" style={{ fontSize: 12.5 }}>USD / month · 100% channel</div>
                     </div>
                   </div>
-                  <Chart
-                    labels={chLabels}
-                    series={[{
-                      name: chObj.name,
-                      color: "color" in chObj ? chObj.color : "#1e3b2f",
-                      values: chSeries.map((r) => metricOf(r, m)),
-                    }]}
-                    formatTick={(v) => fmtTick(m, v)}
-                    formatTip={(v) => fmtTip(m, v)}
-                    empty={<EmptyChart>{emptyCopy(current === "all" ? null : CHANNELS.find((c) => c.id === current) || null)}</EmptyChart>}
-                  />
-                  <div className="chart-foot">
-                    <div>
-                      <span className="big">{m === "views" ? fmtK(rangeSums(chSeries, m).cur) : m === "rpm" ? fmtUSD(rangeSums(chSeries, m).cur) : fmtUSD0(rangeSums(chSeries, m).cur)}</span>
-                      <span> {rangeLabel}</span>
-                    </div>
+                  <div className="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Person</th>
+                          <th className="r">100%</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {chPeople.map((p) => (
+                          <tr key={p.name}>
+                            <td>{p.name}</td>
+                            <td className="r num">{fmtUSD(p.amount)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr>
+                          <td>Total</td>
+                          <td className="r num">{fmtUSD(chOpexMo)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
                   </div>
                 </div>
-              ))}
+              </div>
             </div>
             <div className="card">
               <div className="card-head">
                 <div>
-                  <h3>Daily table</h3>
-                  <div className="sub">Last rows in range · 100% network · USD</div>
+                  <h3>Daily net table</h3>
+                  <div className="sub">Last 14 days · daily net, 100% = estimated revenue − monthly opex ÷ 30</div>
                 </div>
               </div>
               <div className="table-wrap">
@@ -550,17 +658,21 @@ export default function Dashboard() {
                       <tr>
                         <th>Date</th>
                         <th className="r">Views</th>
-                        <th className="r">Est. revenue</th>
+                        <th className="r">Revenue 100%</th>
                         <th className="r">RPM</th>
+                        <th className="r">Opex / day</th>
+                        <th className="r">Daily net</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {chSeries.slice().reverse().slice(0, 31).map((r) => (
+                      {chSeries.slice().reverse().slice(0, 14).map((r) => (
                         <tr key={r.date}>
                           <td>{dateFmt.format(new Date(r.date + "T12:00:00"))}</td>
                           <td className="r num">{fmtInt(r.views)}</td>
                           <td className="r num">{fmtUSD(r.revenue)}</td>
                           <td className="r num">{fmtUSD(r.rpm ?? rpmOf(r.views, r.revenue))}</td>
+                          <td className="r num muted">{r.opex == null ? "—" : "−" + fmtUSD(r.opex)}</td>
+                          <td className="r num" style={{ color: r.net != null && r.net < 0 ? "var(--down)" : undefined }}>{fmtUSD(r.net)}</td>
                         </tr>
                       ))}
                     </tbody>

@@ -12,6 +12,8 @@ export type Channel = {
   url: string;
   source: ChannelSource;
   color: string;
+  monthlyOpexUsd: number;
+  opexPeople: { name: string; amount: number }[];
 };
 
 /** Hard allowlist — never query or display other YouTube channels. */
@@ -24,6 +26,13 @@ export const CHANNELS: Channel[] = [
     url: "https://www.youtube.com/channel/UC0RalGf69iYVBFteHInyJJg/",
     source: "youtube-analytics",
     color: "#c9a34a",
+    monthlyOpexUsd: 1050,
+    opexPeople: [
+      { name: "Daniel", amount: 250 },
+      { name: "Vinicius", amount: 0 },
+      { name: "Joel", amount: 550 },
+      { name: "Helen", amount: 250 },
+    ],
   },
   {
     id: "eventvods",
@@ -32,7 +41,11 @@ export const CHANNELS: Channel[] = [
     youtubeChannelId: "UCQJT7rpynlR7SSdn3OyuI_Q",
     url: "https://www.youtube.com/channel/UCQJT7rpynlR7SSdn3OyuI_Q/",
     source: "csv",
-    color: "#7a9a88",
+    color: "#2e6b8a",
+    monthlyOpexUsd: 500,
+    opexPeople: [
+      { name: "Ricardo", amount: 500 },
+    ],
   },
   {
     id: "onivia",
@@ -41,7 +54,14 @@ export const CHANNELS: Channel[] = [
     youtubeChannelId: "UCPhab209KEicqPJFAk9IZEA",
     url: "https://www.youtube.com/channel/UCPhab209KEicqPJFAk9IZEA/",
     source: "csv",
-    color: "#9fb3a6",
+    color: "#c45c3e",
+    monthlyOpexUsd: 1525,
+    opexPeople: [
+      { name: "Daniel", amount: 470 },
+      { name: "Vinicius", amount: 755 },
+      { name: "Joel", amount: 0 },
+      { name: "Helen", amount: 300 },
+    ],
   },
 ];
 
