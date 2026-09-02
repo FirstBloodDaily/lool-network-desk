@@ -39,7 +39,29 @@ h1, h2, h3, .serif { font-family: var(--serif); font-weight: 400; letter-spacing
 [hidden] { display: none !important; }
 code { font-size: 12px; background: var(--gold-3); padding: 1px 5px; border-radius: 3px; }
 
-.shell { display: grid; grid-template-columns: 248px 1fr; min-height: 100vh; }
+.shell { display: grid; grid-template-columns: 248px minmax(0, 1fr); min-height: 100vh; }
+.shell.nav-collapsed { grid-template-columns: 72px minmax(0, 1fr); }
+.shell.nav-collapsed .sidebar { padding: 16px 10px; align-items: center; }
+.shell.nav-collapsed .brand { margin-bottom: 24px; justify-content: center; flex-direction: column; gap: 10px; }
+.shell.nav-collapsed .brand > div:last-child,
+.shell.nav-collapsed .nav-kicker,
+.shell.nav-collapsed .nav-label,
+.shell.nav-collapsed .side-user > div:last-child { display: none; }
+.shell.nav-collapsed .nav { margin: 0; width: 100%; }
+.shell.nav-collapsed .nav-item { justify-content: center; padding: 10px 8px; }
+.shell.nav-collapsed .nav-item[aria-current="page"]::before { left: -6px; }
+.shell.nav-collapsed .side-user { justify-content: center; }
+.nav-toggle {
+  border: 1px solid rgba(255,255,255,0.14);
+  background: var(--forest-2);
+  color: #cfdad2;
+  width: 32px; height: 32px; border-radius: 8px;
+  display: grid; place-items: center; padding: 0; margin-left: auto;
+}
+.nav-toggle svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.7; }
+.nav-toggle:hover { color: #fff; border-color: var(--gold); }
+.brand { position: relative; }
+.desk { min-width: 0; }
 .sidebar {
   background: var(--forest);
   color: #e9efe9;
@@ -153,7 +175,7 @@ code { font-size: 12px; background: var(--gold-3); padding: 1px 5px; border-radi
 .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
 .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
-.grid-main { display: grid; grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr); gap: 20px; }
+.grid-main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 300px); gap: 20px; align-items: start; }
 @media (max-width: 1200px) {
   .grid-4 { grid-template-columns: repeat(2, 1fr); }
   .grid-3 { grid-template-columns: 1fr; }
@@ -213,11 +235,13 @@ tfoot td { background: #f7f5ee; font-weight: 600; border-top: 1px solid var(--li
 .empty { padding: 40px; text-align: center; color: var(--ink-3); }
 .ch-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }
 
-.chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.chart-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; min-width: 0; }
+.chart-grid .card { min-width: 0; }
+.chart-grid-stack { min-width: 0; display: grid; gap: 20px; align-content: start; }
 @media (max-width: 1100px) { .chart-grid { grid-template-columns: 1fr; } }
-.chart { min-height: 220px; position: relative; overflow: visible; }
-.chart svg { display: block; overflow: visible; }
-.chart.tall { min-height: 260px; }
+.chart { width: 100%; min-height: 240px; position: relative; overflow: visible; }
+.chart svg { display: block; overflow: visible; max-width: 100%; }
+.chart.tall { min-height: 340px; }
 .chart-tip {
   position: absolute; pointer-events: none;
   background: var(--forest); color: #e9efe9;

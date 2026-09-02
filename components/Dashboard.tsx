@@ -165,6 +165,7 @@ export default function Dashboard() {
   const [now] = useState(() => new Date());
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
+  const [navOpen, setNavOpen] = useState(true);
 
   const today = deskTodayStr(now);
   const months = useMemo(() => monthOptions(now), [now]);
@@ -371,7 +372,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="shell">
+    <div className={"shell" + (navOpen ? "" : " nav-collapsed")}>
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-mark">L</div>
@@ -379,20 +380,23 @@ export default function Dashboard() {
             <div className="brand-name">LoL Network</div>
             <div className="brand-sub">Channel desk</div>
           </div>
+          <button type="button" className="nav-toggle" aria-label={navOpen ? "Collapse menu" : "Open menu"} onClick={() => setNavOpen((v) => !v)}>
+            <svg viewBox="0 0 24 24">{navOpen ? <path d="M15 6 9 12l6 6" /> : <path d="M9 6l6 6-6 6" />}</svg>
+          </button>
         </div>
         <p className="nav-kicker">Desk</p>
         <nav className="nav">
           <button className="nav-item" aria-current={page === "home" ? "page" : undefined} onClick={() => setPage("home")}>
             <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-            Home
+            <span className="nav-label">Home</span>
           </button>
           <button className="nav-item" aria-current={page === "channel" ? "page" : undefined} onClick={() => setPage("channel")}>
             <svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
-            Channel detail
+            <span className="nav-label">Channel detail</span>
           </button>
           <button className="nav-item" aria-current={page === "costs" ? "page" : undefined} onClick={() => setPage("costs")}>
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9.5 9.5h3.5a1.5 1.5 0 0 1 0 3h-2a1.5 1.5 0 0 0 0 3h3.5"/></svg>
-            Cost breakdown
+            <span className="nav-label">Cost breakdown</span>
           </button>
         </nav>
         <button
@@ -456,7 +460,7 @@ export default function Dashboard() {
               <Kpi kind="eye" value={fmtK(viewsAll.cur)} label={`Views · ${rangeLabel}`} note="Combined 100% network" cur={viewsAll.cur} prev={viewsAll.prev} />
               <Kpi kind="dollar" value={fmtUSD0(revAll.cur)} label={`Est. revenue · ${rangeLabel}`} note="USD · YouTube estimated revenue" cur={revAll.cur} prev={revAll.prev} />
               <Kpi kind="trend" value={fmtUSD(rpmAll.cur)} label={`Blended RPM · ${rangeLabel}`} note="Revenue per 1,000 views" cur={rpmAll.cur} prev={rpmAll.prev} />
-              <Kpi kind="users" value={`${reporting} / ${CHANNELS.length}`} label="Channels reporting" note={loading ? "Loading…" : reporting ? "Live and/or CSV for this range" : "Empty until live API or real CSV"} />
+              <Kpi kind="users" value={`${reporting} / ${CHANNELS.length}`} label="Channels reporting" note={loading ? "Loading…" : reporting ? "Daily live updates" : "Empty until live API or a real CSV"} />
             </div>
 
             <div className="card">
@@ -474,7 +478,7 @@ export default function Dashboard() {
                         data-ch={c.id}
                         aria-pressed={shown.has(c.id)}
                         onClick={() => toggleCh(c.id)}
-                        style={shown.has(c.id) ? { background: c.color, color: c.id === "oplol" ? "#1e3b2f" : "#fff" } : undefined}
+                        
                       >
                         {shortName(c)}
                       </button>
@@ -782,9 +786,6 @@ export default function Dashboard() {
                 <div className="muted">Eventvods and Onivia · YouTube Studio daily export · {TIMEZONE_LABEL}</div>
               </div>
             </div>
-            <div className="banner">
-              OPLOLReplay uses the live Analytics API when Google env vars are set. Do not upload example or SAMPLE numbers — EXAMPLE files are ignored.
-            </div>
             {uploadMsg ? <div className="banner">{uploadMsg}</div> : null}
             <div className="grid-2">
               {CHANNELS.filter((c) => c.source === "csv").map((c) => {
@@ -817,13 +818,6 @@ export default function Dashboard() {
                   </div>
                 );
               })}
-            </div>
-            <div className="card">
-              <div className="card-head"><div><h3>CSV format</h3><div className="sub">YouTube Studio → Advanced mode → export daily</div></div></div>
-              <pre style={{ margin: 0, fontSize: 13, overflow: "auto" }}>{`Date,Views,Estimated revenue (USD)
-2026-08-01,12345,67.89
-2026-08-02,11001,54.10`}</pre>
-              <p className="muted">That sample above is format only — it is not loaded into the desk. Empty until a real file is parsed.</p>
             </div>
           </section>
         ) : null}

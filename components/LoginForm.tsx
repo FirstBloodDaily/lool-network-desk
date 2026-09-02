@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { VISIT_KEY } from "./SessionGate";
 
 export default function LoginForm({ usingDevDefault }: { usingDevDefault: boolean }) {
   const router = useRouter();
@@ -25,6 +26,7 @@ export default function LoginForm({ usingDevDefault }: { usingDevDefault: boolea
         setError(json.error || "Wrong password.");
         return;
       }
+      try { sessionStorage.setItem(VISIT_KEY, "1"); } catch { /* ignore */ }
       const next = params.get("next") || "/";
       router.replace(next.startsWith("/") ? next : "/");
       router.refresh();

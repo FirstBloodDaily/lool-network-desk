@@ -1,5 +1,5 @@
 export const SESSION_COOKIE = "ln_session";
-export const SESSION_MAX_AGE_SEC = 60 * 60 * 24 * 14; // 14 days
+export const SESSION_MAX_AGE_SEC = 60 * 60 * 12; // HMAC cap; cookie itself is session-only
 const PEPPER = "lool-network-desk-session-v1";
 
 const enc = new TextEncoder();
@@ -75,9 +75,10 @@ export function passwordMatches(given: string, expected: string): boolean {
   return timingSafeEqual(given, expected);
 }
 
-export function cookieSerialize(value: string, maxAge = SESSION_MAX_AGE_SEC): string {
+export function cookieSerialize(value: string): string {
   const secure = isProduction() ? "; Secure" : "";
-  return `${SESSION_COOKIE}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure}`;
+  // No Max-Age: browser drops it when the window is closed. Tab-close is handled client-side.
+  return `${SESSION_COOKIE}=${value}; Path=/; HttpOnly; SameSite=Lax${secure}`;
 }
 
 export function cookieClear(): string {

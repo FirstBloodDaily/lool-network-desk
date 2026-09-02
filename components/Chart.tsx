@@ -56,7 +56,7 @@ export default function Chart({
     return <div className={`chart ${tall ? "tall" : ""}`}>{empty || <EmptyChart>No data for this range.</EmptyChart>}</div>;
   }
 
-  const H = tall ? 260 : 220;
+  const H = tall ? 340 : 240;
   const padL = 58, padR = 18, padT = 14, padB = 32;
   const innerW = Math.max(w - padL - padR, 40);
   const innerH = H - padT - padB;
@@ -105,11 +105,15 @@ export default function Chart({
           );
         })}
         {min < 0 ? <line className="zero" x1={padL} x2={w - padR} y1={y(0)} y2={y(0)} /> : null}
-        {labels.map((l, i) =>
-          i % step === 0 || i === n - 1 ? (
-            <text key={i} className="axis" x={x(i)} y={H - 8} textAnchor={i === 0 ? "start" : i === n - 1 ? "end" : "middle"}>{l}</text>
-          ) : null,
-        )}
+        {(() => {
+          const idxs: number[] = [];
+          for (let i = 0; i < n; i++) if (i % step === 0) idxs.push(i);
+          if (n > 1 && idxs[idxs.length - 1] !== n - 1) idxs.push(n - 1);
+          if (idxs.length >= 2 && idxs[idxs.length - 1] - idxs[idxs.length - 2] < 3) idxs.splice(idxs.length - 2, 1);
+          return idxs.map((i) => (
+            <text key={i} className="axis" x={x(i)} y={H - 8} textAnchor={i === 0 ? "start" : i === n - 1 ? "end" : "middle"}>{labels[i]}</text>
+          ));
+        })()}
         {series.map((s) => {
           let d = "", started = false;
           const dots: React.ReactNode[] = [];
