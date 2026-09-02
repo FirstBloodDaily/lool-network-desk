@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { VISIT_KEY } from "./SessionGate";
+import { IDLE_AT_KEY, VISIT_KEY } from "./SessionGate";
 
 export default function LoginForm({ usingDevDefault }: { usingDevDefault: boolean }) {
   const router = useRouter();
@@ -10,6 +10,7 @@ export default function LoginForm({ usingDevDefault }: { usingDevDefault: boolea
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const idleOut = params.get("idle") === "1";
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -26,7 +27,10 @@ export default function LoginForm({ usingDevDefault }: { usingDevDefault: boolea
         setError(json.error || "Wrong password.");
         return;
       }
-      try { sessionStorage.setItem(VISIT_KEY, "1"); } catch { /* ignore */ }
+      try {
+        sessionStorage.setItem(VISIT_KEY, "1");
+        sessionStorage.setItem(IDLE_AT_KEY, String(Date.now()));
+      } catch { /* ignore */ }
       const next = params.get("next") || "/";
       router.replace(next.startsWith("/") ? next : "/");
       router.refresh();
@@ -39,6 +43,7 @@ export default function LoginForm({ usingDevDefault }: { usingDevDefault: boolea
 
   return (
     <form onSubmit={onSubmit}>
+      {idleOut ? <div className="banner">Signed out after 5 minutes idle.</div> : null}
       {usingDevDefault ? (
         <div className="banner">Local dev default password is <code>dev</code>. Set the site password env var for anything shared.</div>
       ) : null}
