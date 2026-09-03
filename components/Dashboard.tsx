@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CHANNELS, TIMEZONE_LABEL, type Channel, shortName } from "@/lib/channels";
+import { mergeLiveAndCsv } from "@/lib/csv";
 import type { ChannelBlock, DailyPoint, RangeResolved } from "@/lib/types";
 import { monthOptions, deskTodayStr, addDays } from "@/lib/range";
 import { dateFmt, fmtInt, fmtK, fmtUSD, fmtUSD0, fullDateFmt, greeting, rpmOf, trend } from "@/lib/format";
@@ -193,8 +194,12 @@ export default function Dashboard() {
         ok: boolean; error?: string | null; byChannel?: Record<string, ChannelBlock>;
       };
       const next: Record<string, ChannelBlock> = { ...(im.byChannel || {}) };
-      if (an.ok && an.byChannel) {
-        if (an.byChannel.oplol) next.oplol = an.byChannel.oplol;
+      const csvOplol = im.byChannel?.oplol;
+      if (an.ok && an.byChannel?.oplol) {
+        next.oplol = mergeLiveAndCsv(an.byChannel.oplol, csvOplol);
+      } else if (csvOplol?.series?.length) {
+        next.oplol = mergeLiveAndCsv(undefined, csvOplol);
+        if (!an.ok) setYtNote(an.error || "YouTube Analytics is not available. Showing Studio CSV.");
       } else {
         const err = an.error || "YouTube Analytics is not available.";
         setYtNote(err);
@@ -208,7 +213,7 @@ export default function Dashboard() {
           error: err,
         };
       }
-      if (an.ok) setYtNote(an.byChannel?.oplol?.note || null);
+      if (an.ok) setYtNote(next.oplol?.note || null);
       setBlocks(next);
       if (an.range) setRangeMeta(an.range);
     } catch {
