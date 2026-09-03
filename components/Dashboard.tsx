@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CHANNELS, TIMEZONE_LABEL, type Channel, shortName } from "@/lib/channels";
-import { mergeLiveAndCsv } from "@/lib/csv";
+import { mergeLiveAndCsv } from "@/lib/merge";
 import type { ChannelBlock, DailyPoint, RangeResolved } from "@/lib/types";
 import { monthOptions, deskTodayStr, addDays } from "@/lib/range";
 import { dateFmt, fmtInt, fmtK, fmtUSD, fmtUSD0, fullDateFmt, greeting, rpmOf, trend } from "@/lib/format";
