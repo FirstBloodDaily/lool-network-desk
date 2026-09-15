@@ -323,7 +323,7 @@ export default function Dashboard() {
   const emptyCopy = (ch: Channel | null) => {
     if (loading) return "Loading…";
     if (!ch || ch.id === "oplol" || current === "all") {
-      if (ytNote && current !== "eventvods" && current !== "onivia") return ytNote;
+      if (ytNote && current !== "eventvods") return ytNote;
     }
     if (ch && ch.source === "csv") {
       const b = blocks[ch.id];
@@ -716,7 +716,7 @@ export default function Dashboard() {
                     <div className="card-head">
                       <div>
                         <h3>Leagues covered</h3>
-                        <div className="sub">Across the three channels</div>
+                        <div className="sub">Across both channels</div>
                       </div>
                     </div>
                     <div className="tags">
@@ -824,7 +824,7 @@ export default function Dashboard() {
             <div className="page-intro">
               <div>
                 <h2>CSV import</h2>
-                <div className="muted">Eventvods and Onivia · YouTube Studio daily export · {TIMEZONE_LABEL}</div>
+                <div className="muted">Eventvods · YouTube Studio daily export · {TIMEZONE_LABEL}</div>
               </div>
             </div>
             {uploadMsg ? <div className="banner">{uploadMsg}</div> : null}

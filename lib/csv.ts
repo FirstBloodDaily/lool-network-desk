@@ -94,7 +94,6 @@ function channelTokens(ch: Channel): Set<string> {
     add("loleventvods");
     add("eventvod");
   }
-  if (ch.id === "onivia") add("onivia");
   return tokens;
 }
 
@@ -190,7 +189,7 @@ export function parseCsvText(filename: string, text: string, requestedChannel?: 
       example: false,
       channelIds: [],
       series: [],
-      error: "Filename must include eventvods, loleventvods, or onivia (or pass channel=).",
+      error: "Filename must include eventvods or loleventvods (or pass channel=).",
     };
   }
 
@@ -249,7 +248,6 @@ export function saveCsv(channelId: string, originalName: string, text: string): 
 function storeChannelId(name: string): string | undefined {
   const lower = name.toLowerCase();
   if (lower.startsWith("eventvods-") || lower.includes("eventvods") || lower.includes("loleventvods")) return "eventvods";
-  if (lower.startsWith("onivia-") || lower.includes("onivia")) return "onivia";
   if (lower.startsWith("oplol") || lower.includes("oplolreplay")) return "oplol";
   return undefined;
 }

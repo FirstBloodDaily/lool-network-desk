@@ -20,7 +20,7 @@ export async function GET() {
     notes: {
       metrics: "100% network views, estimated revenue USD, RPM. No ownership split.",
       oplol: "OPLOLReplay can be live YouTube Analytics when Google env vars are set.",
-      csv: "Eventvods and Onivia need a Studio CSV until Owner Analytics is available.",
+      csv: "Eventvods needs a Studio CSV until Owner Analytics is available.",
     },
   });
 }

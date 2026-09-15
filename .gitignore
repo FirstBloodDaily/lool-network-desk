@@ -1,0 +1,15 @@
+node_modules
+.next
+out
+.turbo
+.env
+.env.*
+!.env.example
+data/uploads/**
+!data/uploads/.gitkeep
+!data/uploads/README.txt
+data/cache
+.vercel
+.DS_Store
+*.log
+.env*

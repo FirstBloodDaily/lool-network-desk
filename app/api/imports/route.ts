@@ -32,7 +32,7 @@ export async function GET(req: Request) {
         name: c.alias,
         youtubeChannelId: c.youtubeChannelId,
       })),
-      note: "Eventvods and Onivia use Studio CSV until an Owner YouTube Analytics login exists. EXAMPLE files are ignored.",
+      note: "Eventvods uses Studio CSV until an Owner YouTube Analytics login exists. EXAMPLE files are ignored.",
     },
     { headers: { "Cache-Control": "no-store" } },
   );
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
   const ct = req.headers.get("content-type") || "";
   if (!ct.includes("multipart/form-data")) {
     return NextResponse.json(
-      { ok: false, error: "Send multipart/form-data with file and channel=eventvods|onivia." },
+      { ok: false, error: "Send multipart/form-data with file and channel=eventvods." },
       { status: 400 },
     );
   }
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
   const channel = String(form.get("channel") || "").trim().toLowerCase();
   if (!CSV_CHANNEL_IDS.has(channel)) {
     return NextResponse.json(
-      { ok: false, error: "channel must be eventvods or onivia." },
+      { ok: false, error: "channel must be eventvods." },
       { status: 400 },
     );
   }

@@ -5,7 +5,7 @@ export const CURRENCY = "USD" as const;
 export type ChannelSource = "youtube-analytics" | "csv";
 
 export type Channel = {
-  id: "oplol" | "eventvods" | "onivia";
+  id: "oplol" | "eventvods";
   name: string;
   alias: string;
   youtubeChannelId: string;
@@ -53,29 +53,11 @@ export const CHANNELS: Channel[] = [
     leagues: ["First Stand", "LCK", "LEC", "LPL", "MSI", "Worlds"],
     networkCutPct: 0,
   },
-  {
-    id: "onivia",
-    name: "Onivia",
-    alias: "Onivia",
-    youtubeChannelId: "UCPhab209KEicqPJFAk9IZEA",
-    url: "https://www.youtube.com/channel/UCPhab209KEicqPJFAk9IZEA/",
-    source: "csv",
-    color: "#c45c3e",
-    monthlyOpexUsd: 1525,
-    opexPeople: [
-      { name: "Daniel", amount: 470 },
-      { name: "Vinicius", amount: 755 },
-      { name: "Joel", amount: 0 },
-      { name: "Helen", amount: 300 },
-    ],
-    leagues: ["LCK", "LPL", "LEC", "LCS"],
-    networkCutPct: 10,
-  },
 ];
 
 export const OPLOL_YOUTUBE_ID = "UC0RalGf69iYVBFteHInyJJg";
 
-export const CSV_CHANNEL_IDS = new Set(["eventvods", "onivia"]);
+export const CSV_CHANNEL_IDS = new Set(["eventvods"]);
 
 export function channelById(id: string): Channel | undefined {
   return CHANNELS.find((c) => c.id === id);
