@@ -206,7 +206,8 @@ export function parseCsvText(filename: string, text: string, requestedChannel?: 
     const views = vi != null && vi < row.length ? parseNumber(row[vi]) : null;
     const revenue = ri != null && ri < row.length ? parseNumber(row[ri]) : null;
     let rpm = rpmi != null && rpmi < row.length ? parseNumber(row[rpmi]) : null;
-    if (rpm == null && revenue != null && views) rpm = (revenue / views) * 1000;
+    // Only derive RPM when the file has no RPM column; a blank Studio RPM cell stays blank.
+    if (rpm == null && rpmi == null && revenue != null && views) rpm = (revenue / views) * 1000;
     if (views == null && revenue == null) continue;
     const prev = byDate.get(day) || { date: day, views: null, revenue: null, rpm: null };
     byDate.set(day, {

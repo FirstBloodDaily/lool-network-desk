@@ -36,8 +36,8 @@ function metricOf(row: DailyPoint | undefined, key: Metric): number | null {
   if (key === "views") return row.views;
   if (key === "revenue") return row.revenue;
   if (key === "net") return row.net ?? null;
-  if (row.rpm != null) return row.rpm;
-  return rpmOf(row.views, row.revenue);
+  // Blank RPM stays blank (skipped in charts/KPIs) rather than being back-filled from revenue/views.
+  return row.rpm;
 }
 
 function rangeSums(series: DailyPoint[], key: Metric): { cur: number | null; prev: number | null; empty: boolean } {
@@ -754,7 +754,7 @@ export default function Dashboard() {
                           <td>{dateFmt.format(new Date(r.date + "T12:00:00"))}</td>
                           <td className="r num">{fmtInt(r.views)}</td>
                           <td className="r num">{fmtUSD(r.revenue)}</td>
-                          <td className="r num">{fmtUSD(r.rpm ?? rpmOf(r.views, r.revenue))}</td>
+                          <td className="r num">{fmtUSD(r.rpm)}</td>
                           <td className="r num muted">{r.opex == null ? "—" : "−" + fmtUSD(r.opex)}</td>
                           <td className="r num" style={{ color: r.net != null && r.net < 0 ? "var(--down)" : undefined }}>{fmtUSD(r.net)}</td>
                         </tr>
